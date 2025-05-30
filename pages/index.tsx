@@ -1,11 +1,11 @@
 // pages/index.tsx
 import Head from 'next/head';
-import { useState, useEffect } from 'react';
-import JobSearchForm from '@/components/JobSearchForm'; // Client-side component
-import JobList from '@/components/JobList';             // Client-side component
-import ResumeInput from '@/components/ResumeInput';       // Client-side component
-import GeneratedContentDisplay from '@/components/GeneratedContentDisplay'; // Client-side component
-import type { JobPoc } from '@/pages/api/search-jobs'; // Type import is fine
+import { useState, useEffect } from 'react'; // Ensure useEffect is imported
+import JobSearchForm from '@/components/JobSearchForm';
+import JobList from '@/components/JobList';
+import ResumeInput from '@/components/ResumeInput';
+import GeneratedContentDisplay from '@/components/GeneratedContentDisplay';
+import type { JobPoc } from '@/pages/api/search-jobs';
 
 interface ManualJobDetails {
   title: string;
@@ -13,23 +13,31 @@ interface ManualJobDetails {
   description: string;
 }
 
+interface ExtractedResumeData {
+  jobTitleKeywords: string;
+  skills: string;
+  location?: string;
+}
+
 const LOCAL_STORAGE_COVER_LETTER_KEY = 'jobSearcherPoc_savedCoverLetter';
 const LOCAL_STORAGE_COVER_LETTER_JOB_KEY = 'jobSearcherPoc_savedCoverLetterJobContext';
 
 export default function HomePage() {
-  // State for JobSearchForm fields
+  // Form State
   const [searchFormKeywords, setSearchFormKeywords] = useState('');
   const [searchFormLocation, setSearchFormLocation] = useState('');
   const [searchFormSkills, setSearchFormSkills] = useState('');
 
-  // Job Search Results
+  // Job Search & Pagination
   const [jobList, setJobList] = useState<JobPoc[]>([]);
-  const [selectedJob, setSelectedJob] = useState<JobPoc | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobPoc | null>(null); // This is the key state
   const [isSearchingJobs, setIsSearchingJobs] = useState(false);
   const [jobSearchError, setJobSearchError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreJobs, setHasMoreJobs] = useState(false);
 
-  // Manual Job Input
-  const [useManualJobInput, setUseManualJobInput] = useState(false);
+  // Manual Job
+  const [useManualJobInput, setUseManualJobInput] = useState(false); // This is also key
   const [manualJobDetails, setManualJobDetails] = useState<ManualJobDetails>({ title: '', company: '', description: '' });
 
   // Resume
@@ -38,20 +46,138 @@ export default function HomePage() {
   const [resumeParseError, setResumeParseError] = useState<string | null>(null);
   const [isExtractingKeywords, setIsExtractingKeywords] = useState(false);
 
-  // Cover Letter Generation
+  // Cover Letter
   const [generatedCoverLetter, setGeneratedCoverLetter] = useState<string | null>(null);
   const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
   const [coverLetterError, setCoverLetterError] = useState<string | null>(null);
   const [showCoverLetterDownloadWarning, setShowCoverLetterDownloadWarning] = useState(false);
   const [coverLetterJobContext, setCoverLetterJobContext] = useState<string | null>(null);
 
-  // Interview Questions Generation
+  // Interview Questions
   const [generatedInterviewQuestions, setGeneratedInterviewQuestions] = useState<string | null>(null);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
   const [showQuestionsDownloadWarning, setShowQuestionsDownloadWarning] = useState(false);
 
-  // Load saved cover letter from localStorage
+
+  // --- START: Handler Implementations ---
+  const handleJobSelect = (job: JobPoc) => {
+    console.log('HomePage: handleJobSelect CALLED with job:', job.title, job.id);
+    setSelectedJob(job);
+    setUseManualJobInput(false); // Crucial: If a job is selected from list, turn off manual input mode
+    // Clear generated content when a new job is selected
+    setGeneratedCoverLetter(null);
+    setGeneratedInterviewQuestions(null);
+    setCoverLetterError(null);
+    setQuestionsError(null);
+    setShowCoverLetterDownloadWarning(false);
+    setShowQuestionsDownloadWarning(false);
+    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_KEY); // Clear any persisted CL
+    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY);
+  };
+
+  const handleManualJobInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setManualJobDetails(prev => ({ ...prev, [name]: value }));
+    // If using manual input, clear any previously selected job from the list
+    if (useManualJobInput) {
+        setSelectedJob(null);
+    }
+  };
+
+  const getJobDetailsForGeneration = (): { title: string; company: string; description: string } | null => {
+    if (useManualJobInput) {
+      if (manualJobDetails.title && manualJobDetails.company && manualJobDetails.description) {
+        return manualJobDetails;
+      }
+      return null; // Not enough manual info
+    }
+    if (selectedJob) {
+      return {
+        title: selectedJob.title,
+        company: selectedJob.company,
+        description: selectedJob.description,
+      };
+    }
+    return null;
+  };
+
+  const handleGenerateCoverLetter = async () => {
+    const jobDetailsForGen = getJobDetailsForGeneration();
+    if (!jobDetailsForGen || !resumeText) {
+      alert('Please select a job (or fill in manual details) and provide your resume.');
+      return;
+    }
+    setIsGeneratingCoverLetter(true);
+    setCoverLetterError(null);
+    setGeneratedCoverLetter(null);
+    setShowCoverLetterDownloadWarning(false);
+    try {
+      const response = await fetch('/api/generate-cover-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobDetails: jobDetailsForGen, resumeText }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setGeneratedCoverLetter(data.coverLetter);
+      const jobContext = `${jobDetailsForGen.title} at ${jobDetailsForGen.company}`;
+      setCoverLetterJobContext(jobContext);
+      localStorage.setItem(LOCAL_STORAGE_COVER_LETTER_KEY, data.coverLetter);
+      localStorage.setItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY, jobContext);
+      setShowCoverLetterDownloadWarning(true);
+    } catch (error: any) {
+      console.error("Cover letter generation failed:", error);
+      setCoverLetterError(error.message || 'Failed to generate cover letter.');
+    } finally {
+      setIsGeneratingCoverLetter(false);
+    }
+  };
+  
+  const handleClearSavedCoverLetter = () => {
+    setGeneratedCoverLetter(null);
+    setCoverLetterJobContext(null);
+    setShowCoverLetterDownloadWarning(false);
+    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY);
+  };
+
+  const handleGenerateInterviewQuestions = async () => {
+    const jobDetailsForGen = getJobDetailsForGeneration();
+    if (!jobDetailsForGen || !resumeText) {
+      alert('Please select a job (or fill in manual details) and provide your resume.');
+      return;
+    }
+    setIsGeneratingQuestions(true);
+    setQuestionsError(null);
+    setGeneratedInterviewQuestions(null);
+    setShowQuestionsDownloadWarning(false);
+    try {
+      const response = await fetch('/api/generate-interview-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobDetails: jobDetailsForGen, resumeText }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setGeneratedInterviewQuestions(data.questions);
+      setShowQuestionsDownloadWarning(true); // Show warning after successful generation
+    } catch (error: any) {
+      console.error("Interview question generation failed:", error);
+      setQuestionsError(error.message || 'Failed to generate interview questions.');
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+  // --- END: Handler Implementations ---
+
+
   useEffect(() => {
     const savedCL = localStorage.getItem(LOCAL_STORAGE_COVER_LETTER_KEY);
     const savedCLJob = localStorage.getItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY);
@@ -62,32 +188,57 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleJobSearchSubmit = async (keywords: string, location: string, skills: string) => {
+  const handleJobSearchSubmit = async (
+    keywords: string,
+    location: string,
+    skills: string,
+    page: number = 1
+  ) => {
     setIsSearchingJobs(true);
     setJobSearchError(null);
-    setJobList([]);
-    setSelectedJob(null);
+    if (page === 1) {
+        setJobList([]);
+        setSelectedJob(null);
+    }
+    setCurrentPage(page);
+
     try {
-      const response = await fetch('/api/search-jobs', { // API Call
+      const response = await fetch('/api/search-jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords, location, skills }),
+        body: JSON.stringify({ keywords, location, skills, page }),
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
       const data: JobPoc[] = await response.json();
-      setJobList(data);
+      
+      if (page === 1) {
+        setJobList(data);
+      } else {
+        setJobList(prevJobs => [...prevJobs, ...data]);
+      }
+      setHasMoreJobs(data.length > 0);
+
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       setJobSearchError(message || 'Failed to fetch jobs.');
+      setHasMoreJobs(false);
     } finally {
       setIsSearchingJobs(false);
     }
   };
+  
+  const triggerNewJobSearch = () => {
+    if (searchFormKeywords || searchFormSkills) {
+        handleJobSearchSubmit(searchFormKeywords, searchFormLocation || "India", searchFormSkills, 1);
+    } else {
+        setJobSearchError("Please enter keywords or skills, or use resume to suggest terms.");
+    }
+  };
 
-  const handleExtractKeywordsFromResume = async () => {
+  const handleExtractKeywordsFromResumeAndSearch = async () => {
     if (!resumeText) {
       alert('Please upload or paste your resume first.');
       return;
@@ -95,141 +246,64 @@ export default function HomePage() {
     setIsExtractingKeywords(true);
     setJobSearchError(null);
     try {
-      const response = await fetch('/api/extract-resume-keywords', { // API Call
+      const response = await fetch('/api/extract-resume-keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resumeText }),
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to extract keywords.');
+        throw new Error(errorData.message || 'Failed to extract from resume.');
       }
-      const data = await response.json();
-      const keywordsFromResume = data.keywords || "";
-      const allExtracted = keywordsFromResume.split(',').map((k: string) => k.trim()).filter(Boolean);
+      const data: ExtractedResumeData = await response.json();
       
-      setSearchFormKeywords(allExtracted.slice(0, Math.min(3, allExtracted.length)).join(', '));
-      setSearchFormSkills(allExtracted.join(', '));
-      // setSearchFormLocation(''); // Optionally clear location or try to infer
+      const newKeywords = data.jobTitleKeywords || "";
+      const newSkills = data.skills || "";
+      const newLocation = data.location || "India";
 
-      alert('Search fields updated from resume. Review and click "Search Jobs".');
+      setSearchFormKeywords(newKeywords);
+      setSearchFormSkills(newSkills);
+      setSearchFormLocation(newLocation);
+      
+      if (newKeywords || newSkills) {
+        console.log(`Auto-searching with: K=${newKeywords}, L=${newLocation}, S=${newSkills}`);
+        await handleJobSearchSubmit(newKeywords, newLocation, newSkills, 1);
+      } else {
+        alert("Could not extract significant keywords from resume to auto-search. Please enter terms manually.")
+      }
+
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      setJobSearchError(`Keyword extraction failed: ${message}`);
+      setJobSearchError(`Resume analysis failed: ${message}`);
     } finally {
       setIsExtractingKeywords(false);
     }
   };
 
-  const handleJobSelect = (job: JobPoc) => {
-    setSelectedJob(job);
-    setUseManualJobInput(false);
-    setGeneratedInterviewQuestions(null);
-    setShowQuestionsDownloadWarning(false);
-    setCoverLetterError(null);
-    setQuestionsError(null);
-    // Do not clear generatedCoverLetter here to keep localStorage persistence logic simple
-  };
-
-  const handleManualJobInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setManualJobDetails(prev => ({ ...prev, [name]: value }));
-  };
-
-  const getJobDetailsForGeneration = (): { title: string; company: string; description: string } | null => {
-    if (useManualJobInput) {
-      return (manualJobDetails.title && manualJobDetails.company && manualJobDetails.description) ? manualJobDetails : null;
-    }
-    if (selectedJob) {
-      return { title: selectedJob.title, company: selectedJob.company, description: selectedJob.description };
-    }
-    return null;
-  };
-
-  const handleGenerateCoverLetter = async () => {
-    const jobDetailsForGen = getJobDetailsForGeneration();
-    if (!jobDetailsForGen || !resumeText) {
-      alert('Please provide job details and resume content.');
-      return;
-    }
-    setIsGeneratingCoverLetter(true);
-    setCoverLetterError(null);
-    setGeneratedCoverLetter(null);
-    setShowCoverLetterDownloadWarning(false);
-    setCoverLetterJobContext(null);
-
-    try {
-      const response = await fetch('/api/generate-cover-letter', { // API Call
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobDetails: jobDetailsForGen, resumeText }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Cover Letter Gen HTTP error: ${response.status}`);
-      }
-      const data = await response.json();
-      setGeneratedCoverLetter(data.coverLetter);
-      const jobContext = `${jobDetailsForGen.title} at ${jobDetailsForGen.company}`;
-      setCoverLetterJobContext(jobContext);
-      localStorage.setItem(LOCAL_STORAGE_COVER_LETTER_KEY, data.coverLetter);
-      localStorage.setItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY, jobContext);
-      setShowCoverLetterDownloadWarning(true);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      setCoverLetterError(message || 'Failed to generate cover letter.');
-    } finally {
-      setIsGeneratingCoverLetter(false);
+  const handleNextPage = () => {
+    if (hasMoreJobs && !isSearchingJobs) {
+      const nextPage = currentPage + 1;
+      handleJobSearchSubmit(searchFormKeywords, searchFormLocation || "India", searchFormSkills, nextPage);
     }
   };
-
-  const handleClearSavedCoverLetter = () => {
-    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY);
-    setGeneratedCoverLetter(null);
-    setShowCoverLetterDownloadWarning(false);
-    setCoverLetterJobContext(null);
-    alert('Saved cover letter cleared.');
-  };
-
-  const handleGenerateInterviewQuestions = async () => {
-    const jobDetailsForGen = getJobDetailsForGeneration();
-     if (!jobDetailsForGen || !resumeText) {
-      alert('Please provide job details and resume content.');
-      return;
-    }
-    setIsGeneratingQuestions(true);
-    setQuestionsError(null);
-    setGeneratedInterviewQuestions(null);
-    setShowQuestionsDownloadWarning(false);
-    try {
-      const response = await fetch('/api/generate-interview-questions', { // API Call
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobDetails: jobDetailsForGen, resumeText }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Interview Questions Gen HTTP error: ${response.status}`);
-      }
-      const data = await response.json();
-      setGeneratedInterviewQuestions(data.questions);
-      setShowQuestionsDownloadWarning(true);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      setQuestionsError(message || 'Failed to generate interview questions.');
-    } finally {
-      setIsGeneratingQuestions(false);
-    }
-  };
-
+  
   const currentJobForGeneration = getJobDetailsForGeneration();
   const canGenerate = !!(currentJobForGeneration && resumeText && !isParsingResume);
+
+  // Debugging useEffects
+  useEffect(() => {
+    console.log('HomePage: selectedJob STATE UPDATED to:', selectedJob);
+  }, [selectedJob]);
+
+  useEffect(() => {
+    console.log('HomePage: useManualJobInput STATE UPDATED to:', useManualJobInput);
+  }, [useManualJobInput]);
+
 
   return (
     <>
       <Head>
-        <title>AI Job Assistant POC</title>
+        <title>AI Job Assistant (POC)</title>
         <meta name="description" content="AI-powered job searching and application material generation." />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -245,8 +319,8 @@ export default function HomePage() {
         <main className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           <section className="md:col-span-1 space-y-6">
             <JobSearchForm
-              onSearch={handleJobSearchSubmit}
-              isLoading={isSearchingJobs}
+              onSearch={triggerNewJobSearch}
+              isLoading={isSearchingJobs || isExtractingKeywords}
               initialKeywords={searchFormKeywords}
               initialLocation={searchFormLocation}
               initialSkills={searchFormSkills}
@@ -255,17 +329,35 @@ export default function HomePage() {
               setExternalSkills={setSearchFormSkills}
             />
             {jobSearchError && <p className="text-red-500 text-sm px-4 py-2 bg-red-100 rounded">{jobSearchError}</p>}
-            {isSearchingJobs && <p className="text-indigo-600 px-4 animate-pulse">Loading jobs...</p>}
-            {!isSearchingJobs && jobList.length > 0 && (
-              <div className="bg-white shadow-md rounded-lg">
-                <h2 className="text-xl font-semibold p-4 border-b">Job Results ({jobList.length})</h2>
-                <JobList jobs={jobList} selectedJobId={selectedJob?.id || null} onJobSelect={handleJobSelect} />
-              </div>
-            )}
+            {isSearchingJobs && currentPage === 1 && <p className="text-indigo-600 px-4 animate-pulse">Loading jobs...</p>}
+            
             {!isSearchingJobs && jobList.length === 0 && !jobSearchError && (
                  <p className="text-gray-500 p-4 text-center bg-white shadow-md rounded-lg">
-                    Enter search criteria or use your resume to suggest terms.
+                    Upload resume to auto-fill search or enter terms manually.
                  </p>
+            )}
+
+            {jobList.length > 0 && (
+              <div className="bg-white shadow-md rounded-lg">
+                <h2 className="text-xl font-semibold p-4 border-b">Job Results ({jobList.length})</h2>
+                <JobList
+                    jobs={jobList}
+                    selectedJobId={selectedJob?.id || null}
+                    onJobSelect={handleJobSelect} // <<<< Ensure this is correctly passed
+                />
+                {isSearchingJobs && currentPage > 1 && <p className="text-indigo-600 p-2 text-center animate-pulse">Loading more jobs...</p>}
+                {hasMoreJobs && !isSearchingJobs && jobList.length > 0 && (
+                  <div className="p-4 border-t">
+                    <button
+                      onClick={handleNextPage}
+                      disabled={isSearchingJobs}
+                      className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
+                    >
+                      Load More Jobs (Page {currentPage + 1})
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </section>
 
@@ -277,14 +369,18 @@ export default function HomePage() {
                 </span>
                 <button
                     onClick={() => {
-                      setUseManualJobInput(!useManualJobInput);
-                      if (!useManualJobInput) { 
-                        setSelectedJob(null); 
-                        // Clear other states if switching to manual and deselecting a job
-                        setGeneratedInterviewQuestions(null); setShowQuestionsDownloadWarning(false);
-                        setQuestionsError(null);
-                        // Optionally clear cover letter if not tied to localStorage strictly
-                        // setGeneratedCoverLetter(null); setShowCoverLetterDownloadWarning(false); setCoverLetterError(null);
+                      const newUseManualState = !useManualJobInput;
+                      setUseManualJobInput(newUseManualState);
+                      if (newUseManualState) { // If switching TO manual
+                          setSelectedJob(null); // Clear selected job from list
+                          // Optionally clear generated content too
+                          setGeneratedCoverLetter(null);
+                          setGeneratedInterviewQuestions(null);
+                          setShowCoverLetterDownloadWarning(false);
+                          setShowQuestionsDownloadWarning(false);
+                      } else if (manualJobDetails.title || manualJobDetails.company || manualJobDetails.description) {
+                          // If switching FROM manual and manual fields had content, maybe clear them or prompt user
+                          // For now, let's just switch. If a list job was previously selected, it will reappear if not cleared by handleJobSelect
                       }
                     }}
                     className="text-sm text-indigo-600 hover:text-indigo-800"
@@ -292,6 +388,8 @@ export default function HomePage() {
                     {useManualJobInput ? "Use Job from List" : "Or Enter Job Manually"}
                 </button>
               </div>
+
+              {/* Conditional Rendering for Job Details */}
               {useManualJobInput ? (
                 <div className="space-y-3 mt-2 border-t pt-3">
                    <p className="text-sm text-gray-500">Manually enter job details if you found a job elsewhere.</p>
@@ -316,6 +414,14 @@ export default function HomePage() {
                   <pre className="mt-1 text-sm text-gray-800 whitespace-pre-wrap bg-gray-50 p-3 rounded max-h-60 overflow-y-auto">
                     {selectedJob.description}
                   </pre>
+                  {selectedJob.snippet && selectedJob.snippet !== selectedJob.description && (
+                    <>
+                      <h4 className="text-sm font-semibold mt-2 text-gray-600">Snippet:</h4>
+                       <pre className="mt-1 text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                        {selectedJob.snippet}
+                      </pre>
+                    </>
+                  )}
                   {selectedJob.url && <a href={selectedJob.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 text-sm mt-2 inline-block">View Original Post</a>}
                 </div>
               ) : (
@@ -334,11 +440,11 @@ export default function HomePage() {
             
             {resumeText && !isParsingResume && (
                 <button
-                    onClick={handleExtractKeywordsFromResume}
-                    disabled={isExtractingKeywords}
+                    onClick={handleExtractKeywordsFromResumeAndSearch}
+                    disabled={isExtractingKeywords || isSearchingJobs}
                     className="w-full mt-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-400"
                 >
-                    {isExtractingKeywords ? 'Analyzing Resume...' : 'Suggest Search Terms from Resume'}
+                    {isExtractingKeywords ? 'Analyzing Resume for Search...' : 'Search Jobs with Resume Insights'}
                 </button>
             )}
 
@@ -346,14 +452,14 @@ export default function HomePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-white shadow-md rounded-lg mt-4">
                 <button
                   onClick={handleGenerateCoverLetter}
-                  disabled={isGeneratingCoverLetter || isGeneratingQuestions || isExtractingKeywords}
+                  disabled={isGeneratingCoverLetter || isGeneratingQuestions || isExtractingKeywords || isParsingResume}
                   className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400"
                 >
                   {isGeneratingCoverLetter ? 'Generating CL...' : 'Generate Cover Letter'}
                 </button>
                 <button
                   onClick={handleGenerateInterviewQuestions}
-                  disabled={isGeneratingCoverLetter || isGeneratingQuestions || isExtractingKeywords}
+                  disabled={isGeneratingCoverLetter || isGeneratingQuestions || isExtractingKeywords || isParsingResume}
                   className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
                 >
                   {isGeneratingQuestions ? 'Generating Qs...' : 'Generate Interview Questions'}

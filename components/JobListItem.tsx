@@ -8,9 +8,14 @@ interface JobListItemProps {
 }
 
 const JobListItem: React.FC<JobListItemProps> = ({ job, onSelect, isSelected }) => {
+  const handleItemClick = () => {
+    console.log('JobListItem clicked:', job.title, job.id); // <<<< DEBUG
+    onSelect(job);
+  };
+
   return (
     <div
-      onClick={() => onSelect(job)}
+      onClick={handleItemClick} // Make sure it calls the local handler
       className={`p-4 border rounded-lg cursor-pointer hover:shadow-lg transition-shadow ${
         isSelected ? 'bg-indigo-100 border-indigo-500 ring-2 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'
       }`}

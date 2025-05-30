@@ -2,33 +2,33 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios, { AxiosRequestConfig } from 'axios';
 
+// Consistent Job Interface (ensure snippet is still optional)
 export interface JobPoc {
   id: string;
   sourceApi: string;
   title: string;
-  company: string;
+  company: string; // For Upwork, this might be "Client" or "Freelance Opportunity"
   location: string;
   description: string;
   snippet?: string;
   url?: string;
   datePosted?: string;
-  salary?: string;
+  salary?: string; // e.g., budget, hourly rate
 }
 
-// Define a more specific type for incoming job data from APIs
-// This is a generic example; ideally, you'd have specific types for each API's response structure
-type ExternalJobData = Record<string, any>;
-
-
-interface ErrorResponse { message: string; error?: unknown; } // Changed any to unknown
+interface ErrorResponse { message: string; error?: any; }
 interface SearchParams { keywords: string; location: string; skills?: string; page?: number; }
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
+// API Host Constants from .env.local
 const JSEARCH_API_HOST = process.env.RAPIDAPI_JSEARCH_HOST;
-const UPWORKJOBS2_HOST = process.env.RAPIDAPI_UPWORKJOBS2_HOST;
+// const UPWORKJOBS2_HOST = process.env.RAPIDAPI_UPWORKJOBS2_HOST; // Comment out or remove old one
+const UPWORK_JOBS_P_HOST = process.env.RAPIDAPI_UPWORK_JOBS_P_HOST; // <<< NEW HOST
 const LINKEDINPOST_HOST = process.env.RAPIDAPI_LINKEDINPOST_HOST;
 
+
+// --- JSearch API Fetcher (Job Search Endpoint) ---
 async function fetchFromJSearch(params: SearchParams): Promise<JobPoc[]> {
   if (!JSEARCH_API_HOST || !RAPIDAPI_KEY) {
     console.warn('JSearch API not configured. Skipping.');
@@ -44,7 +44,7 @@ async function fetchFromJSearch(params: SearchParams): Promise<JobPoc[]> {
   try {
     const response = await axios.request(options);
     if (response.data && response.data.data) {
-      return response.data.data.map((job: ExternalJobData): JobPoc => { // Typed job
+      return response.data.data.map((job: any): JobPoc => {
         const rawDescription = job.job_description || 'No description available.';
         let jobSnippet = job.job_highlights?.Snippets?.[0] || job.job_highlights?.description;
         if (!jobSnippet && rawDescription && rawDescription !== 'No description available.') {
@@ -63,53 +63,95 @@ async function fetchFromJSearch(params: SearchParams): Promise<JobPoc[]> {
         };
       });
     } return [];
-  } catch (e: unknown) { // Typed e
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    console.error('Error JSearch:', (e as any).response?.data?.message || errorMessage); // Accessing response needs care
-    return [];
-  }
+  } catch (e: any) { console.error('Error JSearch:', e.response?.data?.message || e.message); return []; }
 }
 
-async function fetchFromUpworkJobs2(params: SearchParams): Promise<JobPoc[]> {
-    if (!UPWORKJOBS2_HOST || !RAPIDAPI_KEY) {
-        console.warn('Upwork Jobs API2 not configured. Skipping.');
+
+// --- New Upwork Jobs (upwork-jobs.p.rapidapi.com) Fetcher ---
+async function fetchFromUpworkJobsP(params: SearchParams): Promise<JobPoc[]> {
+    if (!UPWORK_JOBS_P_HOST || !RAPIDAPI_KEY) {
+        console.warn('Upwork Jobs (upwork-jobs.p) API not configured. Skipping.');
         return [];
     }
-    const queryParams: Record<string, string | number> = { limit: 10 }; // Typed queryParams
-    if (params.keywords) {
-        queryParams.q = `${params.keywords} ${params.skills || ''}`.trim();
+
+    // **VERIFY THESE PARAMETERS WITH THE API DOCUMENTATION**
+    // Common parameters might be 'q' or 'query' for keywords, 'loc' for location, 'skills', 'page'.
+    const queryParams: any = {
+        // q: `${params.keywords} ${params.skills || ''}`.trim(), // Example: if 'q' is the search term param
+        // location: params.location, // Example: if location is supported
+        // page: params.page || 1, // Example: if pagination is supported
+        // limit: 10, // Or similar for number of results
+    };
+
+    // The provided cURL does not show search query params, so we MUST assume some common ones
+    // For now, let's try to pass a 'query' param for keywords + skills
+    // And assume it doesn't filter by location, as Upwork jobs are often remote.
+    // If location is a specific city for Upwork, you'd need to map it correctly.
+    if (params.keywords || params.skills) {
+        queryParams.query = `${params.keywords || ''} ${params.skills || ''}`.trim();
     }
+    if (params.page) {
+        queryParams.page = params.page;
+    }
+    // queryParams.limit = 10; // A common parameter for number of results per page
 
     const options: AxiosRequestConfig = {
         method: 'GET',
-        url: `https://${UPWORKJOBS2_HOST}/active-freelance-1h`,
+        url: `https://${UPWORK_JOBS_P_HOST}/jobs`,
         params: queryParams,
-        headers: { 'X-RapidAPI-Key': RAPIDAPI_KEY, 'X-RapidAPI-Host': UPWORKJOBS2_HOST },
+        headers: { 'X-RapidAPI-Key': RAPIDAPI_KEY, 'X-RapidAPI-Host': UPWORK_JOBS_P_HOST },
     };
+
     try {
         const response = await axios.request(options);
-        if (response.data && Array.isArray(response.data.results)) {
-            return response.data.results.map((job: ExternalJobData): JobPoc => ({ // Typed job
-                id: `upworkjobs2-${job.id_upwork || crypto.randomUUID()}`,
-                sourceApi: 'UpworkJobs2',
-                title: job.title_upwork || 'N/A',
-                company: job.client_upwork?.name || 'Freelance Client',
-                location: job.client_upwork?.location || 'Remote',
-                description: job.snippet_upwork || 'No description available.',
-                snippet: job.snippet_upwork,
-                url: job.url_upwork,
-                datePosted: job.date_posted_upwork,
-                salary: job.budget_upwork?.amount ? `${job.budget_upwork.amount} ${job.budget_upwork.currency_code}` : undefined,
-            }));
-        } return [];
-    } catch (e: unknown) { // Typed e
-        const errorMessage = e instanceof Error ? e.message : String(e);
-        console.error('Error UpworkJobs2:', (e as any).response?.data?.message || errorMessage);
+        // console.log("UpworkJobsP Response:", JSON.stringify(response.data, null, 2)); // Log to inspect structure
+
+        // **HYPOTHETICAL MAPPING - MUST BE VERIFIED based on actual response structure**
+        // Common structures: response.data.jobs, response.data.results, or response.data directly if it's an array
+        let jobsArray: any[] = [];
+        if (response.data && Array.isArray(response.data)) { // If response.data is the array
+            jobsArray = response.data;
+        } else if (response.data && Array.isArray(response.data.jobs)) { // If response.data.jobs is the array
+            jobsArray = response.data.jobs;
+        } else if (response.data && Array.isArray(response.data.results)) { // If response.data.results is the array
+            jobsArray = response.data.results;
+        }
+        // Add more checks if needed based on observed response
+
+        if (jobsArray.length > 0) {
+            return jobsArray.map((job: any): JobPoc => {
+                const rawDescription = job.description || job.snippet || 'No description available.';
+                let jobSnippet = job.snippet;
+                if (!jobSnippet && rawDescription && rawDescription !== 'No description available.') {
+                    jobSnippet = rawDescription.substring(0, 150) + (rawDescription.length > 150 ? '...' : '');
+                }
+
+                return {
+                    id: `upwork-jobs-p-${job.id || job.uid || crypto.randomUUID()}`, // Use a unique ID field from the job object
+                    sourceApi: 'UpworkJobsP',
+                    title: job.title || 'N/A',
+                    company: job.client?.name || job.company_name || 'Freelance Client', // Look for client name or company
+                    location: job.client?.location?.country || job.location || 'Remote',
+                    description: rawDescription,
+                    snippet: jobSnippet,
+                    url: job.url || job.link, // Look for a URL field
+                    datePosted: job.date_created || job.posted_time || job.date_posted, // Look for a date field
+                    salary: job.budget?.amount ? `${job.budget.amount} ${job.budget.currency || ''}` : (job.rate?.amount ? `${job.rate.amount}/${job.rate.period || 'hr'}` : undefined),
+                };
+            });
+        }
+        return [];
+    } catch (e: any) {
+        console.error(`Error UpworkJobsP (${UPWORK_JOBS_P_HOST}):`, e.response?.data?.message || e.message);
+        // console.error("Full UpworkJobsP error response:", e.response?.data); // Log full error data if available
         return [];
     }
 }
 
+
+// --- LinkedIn Jobs Search (POST endpoint) Fetcher ---
 async function fetchFromLinkedInPost(params: SearchParams): Promise<JobPoc[]> {
+  // ... (this function remains the same as your last version)
   if (!LINKEDINPOST_HOST || !RAPIDAPI_KEY) {
     console.warn('LinkedIn Jobs Search (POST) API not configured. Skipping.');
     return [];
@@ -132,7 +174,7 @@ async function fetchFromLinkedInPost(params: SearchParams): Promise<JobPoc[]> {
   try {
     const response = await axios.request(options);
     if (response.data && Array.isArray(response.data)) {
-      return response.data.map((job: ExternalJobData): JobPoc => { // Typed job
+      return response.data.map((job: any): JobPoc => {
         const rawDescription = job.job_description || 'No description provided.';
         let jobSnippet;
         if (rawDescription && rawDescription !== 'No description provided.') {
@@ -152,14 +194,13 @@ async function fetchFromLinkedInPost(params: SearchParams): Promise<JobPoc[]> {
         };
       });
     } return [];
-  } catch (e: unknown) { // Typed e
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    console.error('Error LinkedInPost:', (e as any).response?.data?.message || errorMessage);
-    return [];
-  }
+  } catch (e: any) { console.error('Error LinkedInPost:', e.response?.data?.message || e.message); return []; }
 }
 
+
+// --- De-duplication Helper (same as before) ---
 function normalizeAndDeduplicateJobs(jobs: JobPoc[]): JobPoc[] {
+  // ... (this function remains the same)
   const uniqueJobsMap = new Map<string, JobPoc>();
   for (const job of jobs) {
     const title = (job.title || '').toLowerCase().trim().replace(/\s+/g, ' ');
@@ -175,6 +216,7 @@ function normalizeAndDeduplicateJobs(jobs: JobPoc[]): JobPoc[] {
   return Array.from(uniqueJobsMap.values());
 }
 
+// --- Main API Handler ---
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<JobPoc[] | ErrorResponse>
@@ -202,7 +244,8 @@ export default async function handler(
   const fetchPromises: Promise<JobPoc[]>[] = [];
 
   if (JSEARCH_API_HOST) fetchPromises.push(fetchFromJSearch(searchParams));
-  if (UPWORKJOBS2_HOST) fetchPromises.push(fetchFromUpworkJobs2(searchParams));
+  // if (UPWORKJOBS2_HOST) fetchPromises.push(fetchFromUpworkJobs2(searchParams)); // Comment out or remove old one
+  if (UPWORK_JOBS_P_HOST) fetchPromises.push(fetchFromUpworkJobsP(searchParams)); // <<< ADD NEW FETCHER
   if (LINKEDINPOST_HOST) fetchPromises.push(fetchFromLinkedInPost(searchParams));
 
   if (fetchPromises.length === 0) {
@@ -223,9 +266,8 @@ export default async function handler(
 
     const uniqueJobs = normalizeAndDeduplicateJobs(allJobs);
     res.status(200).json(uniqueJobs);
-  } catch (error: unknown) { // Typed error
+  } catch (error: any) {
     console.error('Error in main job search handler:', error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ message: 'Failed to fetch jobs.', error: errorMessage });
+    res.status(500).json({ message: 'Failed to fetch jobs.', error: error.message });
   }
 }
