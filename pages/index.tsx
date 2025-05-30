@@ -1,6 +1,6 @@
 // pages/index.tsx
 import Head from 'next/head';
-import { useState, useEffect } from 'react'; // Ensure useEffect is imported
+import { useState, useEffect } from 'react';
 import JobSearchForm from '@/components/JobSearchForm';
 import JobList from '@/components/JobList';
 import ResumeInput from '@/components/ResumeInput';
@@ -19,8 +19,8 @@ interface ExtractedResumeData {
   location?: string;
 }
 
-const LOCAL_STORAGE_COVER_LETTER_KEY = 'jobSearcherPoc_savedCoverLetter';
-const LOCAL_STORAGE_COVER_LETTER_JOB_KEY = 'jobSearcherPoc_savedCoverLetterJobContext';
+const LOCAL_STORAGE_COVER_LETTER_KEY = 'nexply_savedCoverLetter'; // Updated key
+const LOCAL_STORAGE_COVER_LETTER_JOB_KEY = 'nexply_savedCoverLetterJobContext'; // Updated key
 
 export default function HomePage() {
   // Form State
@@ -30,14 +30,14 @@ export default function HomePage() {
 
   // Job Search & Pagination
   const [jobList, setJobList] = useState<JobPoc[]>([]);
-  const [selectedJob, setSelectedJob] = useState<JobPoc | null>(null); // This is the key state
+  const [selectedJob, setSelectedJob] = useState<JobPoc | null>(null);
   const [isSearchingJobs, setIsSearchingJobs] = useState(false);
   const [jobSearchError, setJobSearchError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreJobs, setHasMoreJobs] = useState(false);
 
   // Manual Job
-  const [useManualJobInput, setUseManualJobInput] = useState(false); // This is also key
+  const [useManualJobInput, setUseManualJobInput] = useState(false);
   const [manualJobDetails, setManualJobDetails] = useState<ManualJobDetails>({ title: '', company: '', description: '' });
 
   // Resume
@@ -60,26 +60,23 @@ export default function HomePage() {
   const [showQuestionsDownloadWarning, setShowQuestionsDownloadWarning] = useState(false);
 
 
-  // --- START: Handler Implementations ---
   const handleJobSelect = (job: JobPoc) => {
-    console.log('HomePage: handleJobSelect CALLED with job:', job.title, job.id);
+    // console.log('HomePage: handleJobSelect CALLED with job:', job.title, job.id);
     setSelectedJob(job);
-    setUseManualJobInput(false); // Crucial: If a job is selected from list, turn off manual input mode
-    // Clear generated content when a new job is selected
+    setUseManualJobInput(false);
     setGeneratedCoverLetter(null);
     setGeneratedInterviewQuestions(null);
     setCoverLetterError(null);
     setQuestionsError(null);
     setShowCoverLetterDownloadWarning(false);
     setShowQuestionsDownloadWarning(false);
-    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_KEY); // Clear any persisted CL
+    localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_KEY);
     localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY);
   };
 
   const handleManualJobInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setManualJobDetails(prev => ({ ...prev, [name]: value }));
-    // If using manual input, clear any previously selected job from the list
     if (useManualJobInput) {
         setSelectedJob(null);
     }
@@ -90,7 +87,7 @@ export default function HomePage() {
       if (manualJobDetails.title && manualJobDetails.company && manualJobDetails.description) {
         return manualJobDetails;
       }
-      return null; // Not enough manual info
+      return null;
     }
     if (selectedJob) {
       return {
@@ -167,7 +164,7 @@ export default function HomePage() {
       }
       const data = await response.json();
       setGeneratedInterviewQuestions(data.questions);
-      setShowQuestionsDownloadWarning(true); // Show warning after successful generation
+      setShowQuestionsDownloadWarning(true);
     } catch (error: any) {
       console.error("Interview question generation failed:", error);
       setQuestionsError(error.message || 'Failed to generate interview questions.');
@@ -175,8 +172,6 @@ export default function HomePage() {
       setIsGeneratingQuestions(false);
     }
   };
-  // --- END: Handler Implementations ---
-
 
   useEffect(() => {
     const savedCL = localStorage.getItem(LOCAL_STORAGE_COVER_LETTER_KEY);
@@ -266,7 +261,7 @@ export default function HomePage() {
       setSearchFormLocation(newLocation);
       
       if (newKeywords || newSkills) {
-        console.log(`Auto-searching with: K=${newKeywords}, L=${newLocation}, S=${newSkills}`);
+        // console.log(`Auto-searching with: K=${newKeywords}, L=${newLocation}, S=${newSkills}`);
         await handleJobSearchSubmit(newKeywords, newLocation, newSkills, 1);
       } else {
         alert("Could not extract significant keywords from resume to auto-search. Please enter terms manually.")
@@ -290,30 +285,30 @@ export default function HomePage() {
   const currentJobForGeneration = getJobDetailsForGeneration();
   const canGenerate = !!(currentJobForGeneration && resumeText && !isParsingResume);
 
-  // Debugging useEffects
-  useEffect(() => {
-    console.log('HomePage: selectedJob STATE UPDATED to:', selectedJob);
-  }, [selectedJob]);
+  // useEffect(() => {
+  //   console.log('HomePage: selectedJob STATE UPDATED to:', selectedJob);
+  // }, [selectedJob]);
 
-  useEffect(() => {
-    console.log('HomePage: useManualJobInput STATE UPDATED to:', useManualJobInput);
-  }, [useManualJobInput]);
-
+  // useEffect(() => {
+  //   console.log('HomePage: useManualJobInput STATE UPDATED to:', useManualJobInput);
+  // }, [useManualJobInput]);
 
   return (
     <>
       <Head>
-        <title>AI Job Assistant (POC)</title>
-        <meta name="description" content="AI-powered job searching and application material generation." />
-        <link rel="icon" href="/favicon.ico" />
+        <title>Nexply - Apply Smarter, Faster</title> {/* <<<< UPDATED */}
+        <meta name="description" content="Nexply: AI-powered job discovery and application assistance." /> {/* <<<< UPDATED */}
+        <link rel="icon" href="/favicon.ico" /> {/* You might want a new favicon later */}
       </Head>
 
       <div className="min-h-screen bg-gray-100 py-8 px-4 sm:px-6 lg:px-8">
         <header className="text-center mb-10">
           <h1 className="text-4xl font-extrabold text-gray-900">
-            AI Job Assistant <span className="text-indigo-600">(POC)</span>
+            Nexply <span className="text-indigo-600">- Apply Smarter</span> {/* <<<< UPDATED */}
           </h1>
-          <p className="mt-2 text-lg text-gray-600">Find jobs, generate materials, and prepare for interviews.</p>
+          <p className="mt-2 text-lg text-gray-600">
+            Discover opportunities and craft compelling application materials with AI. {/* <<<< UPDATED */}
+          </p>
         </header>
 
         <main className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -343,7 +338,7 @@ export default function HomePage() {
                 <JobList
                     jobs={jobList}
                     selectedJobId={selectedJob?.id || null}
-                    onJobSelect={handleJobSelect} // <<<< Ensure this is correctly passed
+                    onJobSelect={handleJobSelect}
                 />
                 {isSearchingJobs && currentPage > 1 && <p className="text-indigo-600 p-2 text-center animate-pulse">Loading more jobs...</p>}
                 {hasMoreJobs && !isSearchingJobs && jobList.length > 0 && (
@@ -371,16 +366,12 @@ export default function HomePage() {
                     onClick={() => {
                       const newUseManualState = !useManualJobInput;
                       setUseManualJobInput(newUseManualState);
-                      if (newUseManualState) { // If switching TO manual
-                          setSelectedJob(null); // Clear selected job from list
-                          // Optionally clear generated content too
+                      if (newUseManualState) {
+                          setSelectedJob(null);
                           setGeneratedCoverLetter(null);
                           setGeneratedInterviewQuestions(null);
                           setShowCoverLetterDownloadWarning(false);
                           setShowQuestionsDownloadWarning(false);
-                      } else if (manualJobDetails.title || manualJobDetails.company || manualJobDetails.description) {
-                          // If switching FROM manual and manual fields had content, maybe clear them or prompt user
-                          // For now, let's just switch. If a list job was previously selected, it will reappear if not cleared by handleJobSelect
                       }
                     }}
                     className="text-sm text-indigo-600 hover:text-indigo-800"
@@ -389,7 +380,6 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Conditional Rendering for Job Details */}
               {useManualJobInput ? (
                 <div className="space-y-3 mt-2 border-t pt-3">
                    <p className="text-sm text-gray-500">Manually enter job details if you found a job elsewhere.</p>
@@ -500,7 +490,9 @@ export default function HomePage() {
         </main>
 
         <footer className="text-center mt-12 py-4 border-t border-gray-300">
-          <p className="text-sm text-gray-600">AI Job Assistant (POC) - Powered by Gemini & Next.js</p>
+          <p className="text-sm text-gray-600">
+            Nexply - Powered by Gemini & Next.js {/* <<<< UPDATED */}
+          </p>
         </footer>
       </div>
     </>
