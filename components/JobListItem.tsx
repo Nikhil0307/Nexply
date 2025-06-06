@@ -1,5 +1,6 @@
+// components/JobListItem.tsx
 import React from 'react';
-import type { JobPoc } from '@/pages/api/search-jobs'; // Adjust path if necessary
+import type { JobPoc } from '@/pages/api/search-jobs';
 
 interface JobListItemProps {
   job: JobPoc;
@@ -9,21 +10,33 @@ interface JobListItemProps {
 
 const JobListItem: React.FC<JobListItemProps> = ({ job, onSelect, isSelected }) => {
   const handleItemClick = () => {
-    console.log('JobListItem clicked:', job.title, job.id); // <<<< DEBUG
     onSelect(job);
   };
 
   return (
     <div
-      onClick={handleItemClick} // Make sure it calls the local handler
-      className={`p-4 border rounded-lg cursor-pointer hover:shadow-lg transition-shadow ${
-        isSelected ? 'bg-indigo-100 border-indigo-500 ring-2 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'
-      }`}
+      onClick={handleItemClick}
+      className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ease-in-out transform
+        ${
+          isSelected 
+            ? 'bg-sky-700/80 border-sky-500 ring-2 ring-sky-400 shadow-xl scale-[1.02]' // Slightly more pronounced selection
+            : 'bg-slate-800 border-slate-700 hover:bg-slate-700/70 hover:border-slate-600 hover:shadow-lg hover:scale-[1.01]'
+        }`}
     >
-      <h3 className="text-lg font-semibold text-indigo-700">{job.title}</h3>
-      <p className="text-sm text-gray-600">{job.company}</p>
-      <p className="text-sm text-gray-500">{job.location}</p>
-      {job.snippet && <p className="text-xs text-gray-500 mt-1">{job.snippet}</p>}
+      <h3 className={`text-lg font-semibold ${isSelected ? 'text-white' : 'text-sky-400'}`}>
+        {job.title}
+      </h3>
+      <p className={`text-sm ${isSelected ? 'text-slate-200' : 'text-slate-300'}`}>
+        {job.company}
+      </p>
+      <p className={`text-sm ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
+        {job.location}
+      </p>
+      {job.snippet && (
+        <p className={`text-xs ${isSelected ? 'text-slate-300' : 'text-slate-400'} mt-1 leading-relaxed`}>
+          {job.snippet}
+        </p>
+      )}
     </div>
   );
 };

@@ -23,14 +23,14 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
     setIsParsingResume?.(true);
     setResumeParseError?.(null);
-    setResumeText('');
-    setFileName(null);
+    setResumeText(''); // Clear existing text when new file is processed
+    setFileName(null); // Clear old file name
 
     const formData = new FormData();
-    formData.append('resumeFile', file); // Key 'resumeFile' matches what API route expects
+    formData.append('resumeFile', file);
 
     try {
-      const response = await fetch('/api/parse-resume', { // API call
+      const response = await fetch('/api/parse-resume', {
         method: 'POST',
         body: formData,
       });
@@ -43,16 +43,15 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const data = await response.json();
       setResumeText(data.text);
       setFileName(data.fileName);
-      setShowTextArea(true); // Show textarea with parsed content
+      setShowTextArea(true); 
     } catch (error) {
-      console.error('Error uploading or parsing resume file:', error);
       const message = error instanceof Error ? error.message : 'Failed to process resume file.';
       setResumeParseError?.(message);
       setFileName(null);
     } finally {
       setIsParsingResume?.(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''; // Reset file input
+        fileInputRef.current.value = '';
       }
     }
   };
@@ -64,35 +63,30 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const handleDrop = useCallback(async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.classList.remove('border-indigo-600', 'bg-indigo-50');
+    event.currentTarget.classList.remove('border-sky-500', 'bg-slate-700/30'); // Use consistent hover state removal
     await processFileWithApi(event.dataTransfer.files?.[0]);
-  }, []); // No dependencies needed if processFileWithApi doesn't rely on changing props/state directly from here
+  }, [processFileWithApi]); // Added processFileWithApi as dependency
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = 'copy';
-    event.currentTarget.classList.add('border-indigo-600', 'bg-indigo-50');
+    event.currentTarget.classList.add('border-sky-500', 'bg-slate-700/30'); // Consistent hover state
   };
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.classList.remove('border-indigo-600', 'bg-indigo-50');
+    event.currentTarget.classList.remove('border-sky-500', 'bg-slate-700/30'); // Consistent hover state removal
   };
 
   const toggleTextArea = () => {
     setShowTextArea(!showTextArea);
-    if (showTextArea && resumeText) {
-        // If hiding textarea and there's text, user might want to clear filename
-        // or indicate that the text area content is now the source of truth.
-        // setFileName(null); // Optional: clear filename if hiding and text exists
-    }
   };
 
   return (
-    <div className="p-4 bg-white shadow-md rounded-lg">
-      <label htmlFor="resume-upload" className="block text-sm font-medium text-gray-700 mb-2">
+    <div className="p-4 sm:p-6 bg-slate-800 shadow-xl rounded-lg">
+      <label htmlFor="resume-upload" className="block text-sm font-medium text-slate-300 mb-2">
         Upload or Paste Your Resume
       </label>
 
@@ -101,7 +95,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => fileInputRef.current?.click()}
-        className="mb-4 p-6 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-indigo-500 transition-colors"
+        className="mb-4 p-6 border-2 border-dashed border-slate-600 rounded-lg text-center cursor-pointer hover:border-sky-500 hover:bg-slate-700/30 transition-colors duration-150"
       >
         <input
           type="file"
@@ -111,22 +105,33 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
           className="hidden"
           accept=".pdf,.doc,.docx,text/plain,.txt"
         />
+        {/* Placeholder Icon (replace with actual SVG icon component) */}
+        {!fileName && (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="mx-auto h-12 w-12 text-slate-500 mb-2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+            </svg>
+        )}
         {fileName ? (
-          <p className="text-sm text-gray-700">File: {fileName}</p>
+          <p className="text-sm text-slate-300">File: <span className="font-medium text-sky-400">{fileName}</span></p>
         ) : (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-400">
             Drag & drop (PDF, DOCX, TXT) or click to select.
           </p>
         )}
       </div>
 
-      <div className="text-center mb-4">
-        <span className="text-sm text-gray-500">OR</span>
+      <div className="relative text-center mb-4">
+        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+          <div className="w-full border-t border-slate-700" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-slate-800 px-2 text-sm text-slate-500">OR</span>
+        </div>
       </div>
 
       <button
         onClick={toggleTextArea}
-        className="w-full mb-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        className="w-full mb-3 py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-sky-500 transition-colors duration-150"
       >
         {showTextArea ? 'Hide Manual Input' : 'Type or Paste Resume Content'}
       </button>
@@ -137,7 +142,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
           <textarea
             id="resume-text"
             rows={10}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
             placeholder="Paste your full resume text here..."
             value={resumeText}
             onChange={(e) => {

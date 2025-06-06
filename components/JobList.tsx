@@ -1,26 +1,28 @@
+// components/JobList.tsx
 import React from 'react';
 import JobListItem from './JobListItem';
-import type { JobPoc } from '@/pages/api/search-jobs'; // Adjust path
+import type { JobPoc } from '@/pages/api/search-jobs';
 
 interface JobListProps {
   jobs: JobPoc[];
   selectedJobId: string | null;
-  onJobSelect: (job: JobPoc) => void; // This is the prop received from HomePage
+  onJobSelect: (job: JobPoc) => void;
 }
 
 const JobList: React.FC<JobListProps> = ({ jobs, selectedJobId, onJobSelect }) => {
   if (jobs.length === 0) {
-    return <p className="text-gray-500 p-4 text-center">No jobs found for your criteria.</p>;
+    // This specific message is better handled in index.tsx now, 
+    // but returning null or an empty fragment is also an option here.
+    return <p className="text-slate-400 p-4 text-center">No jobs found for your criteria.</p>;
   }
-  // console.log("JobList received onJobSelect:", typeof onJobSelect); // <<<< Optional DEBUG
 
   return (
-    <div className="space-y-3 p-1 max-h-[600px] overflow-y-auto">
+    <div className="space-y-3 p-2 md:p-3 max-h-[500px] overflow-y-auto"> {/* Scrollbar styles from globals.css will apply */}
       {jobs.map((job) => (
         <JobListItem
           key={job.id}
           job={job}
-          onSelect={onJobSelect} // Pass the received onJobSelect to JobListItem's onSelect
+          onSelect={onJobSelect}
           isSelected={job.id === selectedJobId}
         />
       ))}

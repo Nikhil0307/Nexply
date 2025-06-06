@@ -19,8 +19,8 @@ interface ExtractedResumeData {
   location?: string;
 }
 
-const LOCAL_STORAGE_COVER_LETTER_KEY = 'nexply_savedCoverLetter'; // Updated key
-const LOCAL_STORAGE_COVER_LETTER_JOB_KEY = 'nexply_savedCoverLetterJobContext'; // Updated key
+const LOCAL_STORAGE_COVER_LETTER_KEY = 'nexply_savedCoverLetter_v2';
+const LOCAL_STORAGE_COVER_LETTER_JOB_KEY = 'nexply_savedCoverLetterJobContext_v2';
 
 export default function HomePage() {
   // Form State
@@ -61,7 +61,6 @@ export default function HomePage() {
 
 
   const handleJobSelect = (job: JobPoc) => {
-    // console.log('HomePage: handleJobSelect CALLED with job:', job.title, job.id);
     setSelectedJob(job);
     setUseManualJobInput(false);
     setGeneratedCoverLetter(null);
@@ -127,7 +126,6 @@ export default function HomePage() {
       localStorage.setItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY, jobContext);
       setShowCoverLetterDownloadWarning(true);
     } catch (error: any) {
-      console.error("Cover letter generation failed:", error);
       setCoverLetterError(error.message || 'Failed to generate cover letter.');
     } finally {
       setIsGeneratingCoverLetter(false);
@@ -166,7 +164,6 @@ export default function HomePage() {
       setGeneratedInterviewQuestions(data.questions);
       setShowQuestionsDownloadWarning(true);
     } catch (error: any) {
-      console.error("Interview question generation failed:", error);
       setQuestionsError(error.message || 'Failed to generate interview questions.');
     } finally {
       setIsGeneratingQuestions(false);
@@ -214,7 +211,7 @@ export default function HomePage() {
       } else {
         setJobList(prevJobs => [...prevJobs, ...data]);
       }
-      setHasMoreJobs(data.length > 0);
+      setHasMoreJobs(data.length > 0); // Assuming API returns empty array if no more jobs
 
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -254,14 +251,13 @@ export default function HomePage() {
       
       const newKeywords = data.jobTitleKeywords || "";
       const newSkills = data.skills || "";
-      const newLocation = data.location || "India";
+      const newLocation = data.location || "India"; // Default location if not found
 
       setSearchFormKeywords(newKeywords);
       setSearchFormSkills(newSkills);
       setSearchFormLocation(newLocation);
       
       if (newKeywords || newSkills) {
-        // console.log(`Auto-searching with: K=${newKeywords}, L=${newLocation}, S=${newSkills}`);
         await handleJobSearchSubmit(newKeywords, newLocation, newSkills, 1);
       } else {
         alert("Could not extract significant keywords from resume to auto-search. Please enter terms manually.")
@@ -285,29 +281,21 @@ export default function HomePage() {
   const currentJobForGeneration = getJobDetailsForGeneration();
   const canGenerate = !!(currentJobForGeneration && resumeText && !isParsingResume);
 
-  // useEffect(() => {
-  //   console.log('HomePage: selectedJob STATE UPDATED to:', selectedJob);
-  // }, [selectedJob]);
-
-  // useEffect(() => {
-  //   console.log('HomePage: useManualJobInput STATE UPDATED to:', useManualJobInput);
-  // }, [useManualJobInput]);
-
   return (
     <>
       <Head>
-        <title>Nexply - Apply Smarter, Faster</title> {/* <<<< UPDATED */}
-        <meta name="description" content="Nexply: AI-powered job discovery and application assistance." /> {/* <<<< UPDATED */}
-        <link rel="icon" href="/favicon.ico" /> {/* You might want a new favicon later */}
+        <title>Nexply - Apply Smarter, Faster</title>
+        <meta name="description" content="Nexply: AI-powered job discovery and application assistance." />
+        <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="min-h-screen bg-gray-100 py-8 px-4 sm:px-6 lg:px-8">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-extrabold text-gray-900">
-            Nexply <span className="text-indigo-600">- Apply Smarter</span> {/* <<<< UPDATED */}
+      <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 selection:bg-sky-700 selection:text-white">
+        <header className="text-center mb-10 md:mb-16">
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-100">
+            Nexply <span className="text-sky-400">- Apply Smarter</span>
           </h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Discover opportunities and craft compelling application materials with AI. {/* <<<< UPDATED */}
+          <p className="mt-3 text-lg text-slate-300 max-w-2xl mx-auto">
+            Discover opportunities and craft compelling application materials with AI.
           </p>
         </header>
 
@@ -323,30 +311,36 @@ export default function HomePage() {
               setExternalLocation={setSearchFormLocation}
               setExternalSkills={setSearchFormSkills}
             />
-            {jobSearchError && <p className="text-red-500 text-sm px-4 py-2 bg-red-100 rounded">{jobSearchError}</p>}
-            {isSearchingJobs && currentPage === 1 && <p className="text-indigo-600 px-4 animate-pulse">Loading jobs...</p>}
+            {jobSearchError && (
+              <div className="p-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg text-sm shadow-md">
+                {jobSearchError}
+              </div>
+            )}
+            {isSearchingJobs && currentPage === 1 && (
+              <p className="text-sky-400 px-4 animate-pulse">Loading jobs...</p>
+            )}
             
             {!isSearchingJobs && jobList.length === 0 && !jobSearchError && (
-                 <p className="text-gray-500 p-4 text-center bg-white shadow-md rounded-lg">
+                 <div className="text-slate-400 p-6 text-center bg-slate-800 shadow-xl rounded-lg">
                     Upload resume to auto-fill search or enter terms manually.
-                 </p>
+                 </div>
             )}
 
             {jobList.length > 0 && (
-              <div className="bg-white shadow-md rounded-lg">
-                <h2 className="text-xl font-semibold p-4 border-b">Job Results ({jobList.length})</h2>
+              <div className="bg-slate-800 shadow-xl rounded-lg overflow-hidden">
+                <h2 className="text-xl font-semibold p-4 border-b border-slate-700 text-slate-100">Job Results ({jobList.length})</h2>
                 <JobList
                     jobs={jobList}
                     selectedJobId={selectedJob?.id || null}
                     onJobSelect={handleJobSelect}
                 />
-                {isSearchingJobs && currentPage > 1 && <p className="text-indigo-600 p-2 text-center animate-pulse">Loading more jobs...</p>}
+                {isSearchingJobs && currentPage > 1 && <p className="text-sky-400 p-3 text-center animate-pulse">Loading more jobs...</p>}
                 {hasMoreJobs && !isSearchingJobs && jobList.length > 0 && (
-                  <div className="p-4 border-t">
+                  <div className="p-4 border-t border-slate-700">
                     <button
                       onClick={handleNextPage}
                       disabled={isSearchingJobs}
-                      className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
+                      className="w-full py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-sky-500 disabled:bg-slate-600 disabled:text-slate-400 transition-colors duration-150"
                     >
                       Load More Jobs (Page {currentPage + 1})
                     </button>
@@ -357,10 +351,10 @@ export default function HomePage() {
           </section>
 
           <section className="md:col-span-2 space-y-6">
-            <div className="p-4 bg-white shadow-md rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xl font-semibold text-gray-700">
-                  {useManualJobInput ? "Manually Entered Job" : selectedJob ? "Selected Job" : "Job Details"}
+            <div className="p-4 sm:p-6 bg-slate-800 shadow-xl rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xl font-semibold text-slate-100">
+                  {useManualJobInput ? "Manually Entered Job" : selectedJob ? "Selected Job Details" : "Job Details"}
                 </span>
                 <button
                     onClick={() => {
@@ -372,50 +366,53 @@ export default function HomePage() {
                           setGeneratedInterviewQuestions(null);
                           setShowCoverLetterDownloadWarning(false);
                           setShowQuestionsDownloadWarning(false);
+                          localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_KEY);
+                          localStorage.removeItem(LOCAL_STORAGE_COVER_LETTER_JOB_KEY);
                       }
                     }}
-                    className="text-sm text-indigo-600 hover:text-indigo-800"
+                    className="text-sm text-sky-400 hover:text-sky-300 hover:underline"
                 >
                     {useManualJobInput ? "Use Job from List" : "Or Enter Job Manually"}
                 </button>
               </div>
+              <hr className="border-slate-700 my-3" />
 
               {useManualJobInput ? (
-                <div className="space-y-3 mt-2 border-t pt-3">
-                   <p className="text-sm text-gray-500">Manually enter job details if you found a job elsewhere.</p>
+                <div className="space-y-4 mt-2">
+                   <p className="text-sm text-slate-400">Manually enter job details if you found a job elsewhere.</p>
                   <div>
-                    <label htmlFor="manualTitle" className="block text-sm font-medium text-gray-700">Job Title</label>
-                    <input type="text" name="title" id="manualTitle" value={manualJobDetails.title} onChange={handleManualJobInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
+                    <label htmlFor="manualTitle" className="block text-sm font-medium text-slate-300">Job Title</label>
+                    <input type="text" name="title" id="manualTitle" value={manualJobDetails.title} onChange={handleManualJobInputChange} className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required />
                   </div>
                   <div>
-                    <label htmlFor="manualCompany" className="block text-sm font-medium text-gray-700">Company</label>
-                    <input type="text" name="company" id="manualCompany" value={manualJobDetails.company} onChange={handleManualJobInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required/>
+                    <label htmlFor="manualCompany" className="block text-sm font-medium text-slate-300">Company</label>
+                    <input type="text" name="company" id="manualCompany" value={manualJobDetails.company} onChange={handleManualJobInputChange} className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required/>
                   </div>
                   <div>
-                    <label htmlFor="manualDescription" className="block text-sm font-medium text-gray-700">Job Description</label>
-                    <textarea name="description" id="manualDescription" rows={6} value={manualJobDetails.description} onChange={handleManualJobInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Paste the full job description here..." required></textarea>
+                    <label htmlFor="manualDescription" className="block text-sm font-medium text-slate-300">Job Description</label>
+                    <textarea name="description" id="manualDescription" rows={6} value={manualJobDetails.description} onChange={handleManualJobInputChange} className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 sm:text-sm" placeholder="Paste the full job description here..." required></textarea>
                   </div>
                 </div>
               ) : selectedJob ? (
-                <div className="mt-2 border-t pt-3">
-                  <h3 className="text-lg font-bold text-indigo-700">{selectedJob.title}</h3>
-                  <p className="text-md text-gray-700">{selectedJob.company} - {selectedJob.location}</p>
-                  <h4 className="text-sm font-semibold mt-2 text-gray-600">Full Description:</h4>
-                  <pre className="mt-1 text-sm text-gray-800 whitespace-pre-wrap bg-gray-50 p-3 rounded max-h-60 overflow-y-auto">
+                <div className="mt-2 space-y-2">
+                  <h3 className="text-xl font-bold text-sky-400">{selectedJob.title}</h3>
+                  <p className="text-md text-slate-300">{selectedJob.company} - {selectedJob.location}</p>
+                  <h4 className="text-sm font-semibold mt-3 text-slate-300">Full Description:</h4>
+                  <pre className="mt-1 text-sm text-slate-200 whitespace-pre-wrap bg-slate-900 p-3 rounded-md max-h-60 overflow-y-auto">
                     {selectedJob.description}
                   </pre>
                   {selectedJob.snippet && selectedJob.snippet !== selectedJob.description && (
                     <>
-                      <h4 className="text-sm font-semibold mt-2 text-gray-600">Snippet:</h4>
-                       <pre className="mt-1 text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                      <h4 className="text-sm font-semibold mt-2 text-slate-300">Snippet:</h4>
+                       <pre className="mt-1 text-xs text-slate-300 whitespace-pre-wrap bg-slate-900 p-2 rounded-md max-h-32 overflow-y-auto">
                         {selectedJob.snippet}
                       </pre>
                     </>
                   )}
-                  {selectedJob.url && <a href={selectedJob.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 text-sm mt-2 inline-block">View Original Post</a>}
+                  {selectedJob.url && <a href={selectedJob.url} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:text-sky-300 hover:underline text-sm mt-2 inline-block">View Original Post ↗</a>}
                 </div>
               ) : (
-                <p className="text-gray-500 mt-2 border-t pt-3">Select a job from the list or enter details manually to proceed.</p>
+                <p className="text-slate-400 mt-2">Select a job from the list or enter details manually to proceed.</p>
               )}
             </div>
             
@@ -425,46 +422,50 @@ export default function HomePage() {
               setIsParsingResume={setIsParsingResume}
               setResumeParseError={setResumeParseError}
             />
-            {isParsingResume && <p className="text-sm text-center text-indigo-600 p-2 animate-pulse">Parsing resume...</p>}
-            {resumeParseError && <p className="text-sm text-center text-red-600 p-2 bg-red-100 rounded">Resume Error: {resumeParseError}</p>}
+            {isParsingResume && <p className="text-sm text-center text-sky-400 p-2 animate-pulse">Parsing resume...</p>}
+            {resumeParseError && (
+              <div className="p-3 bg-red-900/30 border border-red-700 text-red-300 rounded-lg text-sm text-center shadow-md">
+                  Resume Error: {resumeParseError}
+              </div>
+            )}
             
             {resumeText && !isParsingResume && (
                 <button
                     onClick={handleExtractKeywordsFromResumeAndSearch}
                     disabled={isExtractingKeywords || isSearchingJobs}
-                    className="w-full mt-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-400"
+                    className="w-full mt-2 py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-purple-500 disabled:bg-slate-600 disabled:text-slate-400 transition-colors duration-150"
                 >
-                    {isExtractingKeywords ? 'Analyzing Resume for Search...' : 'Search Jobs with Resume Insights'}
+                    {isExtractingKeywords ? 'Analyzing Resume for Search...' : '✨ Search Jobs with Resume Insights'}
                 </button>
             )}
 
             {canGenerate && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-white shadow-md rounded-lg mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-800 shadow-xl rounded-lg mt-4">
                 <button
                   onClick={handleGenerateCoverLetter}
                   disabled={isGeneratingCoverLetter || isGeneratingQuestions || isExtractingKeywords || isParsingResume}
-                  className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400"
+                  className="w-full py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-green-500 disabled:bg-slate-600 disabled:text-slate-400 transition-colors duration-150"
                 >
-                  {isGeneratingCoverLetter ? 'Generating CL...' : 'Generate Cover Letter'}
+                  {isGeneratingCoverLetter ? 'Generating CL...' : '📄 Generate Cover Letter'}
                 </button>
                 <button
                   onClick={handleGenerateInterviewQuestions}
                   disabled={isGeneratingCoverLetter || isGeneratingQuestions || isExtractingKeywords || isParsingResume}
-                  className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+                  className="w-full py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-blue-500 disabled:bg-slate-600 disabled:text-slate-400 transition-colors duration-150"
                 >
-                  {isGeneratingQuestions ? 'Generating Qs...' : 'Generate Interview Questions'}
+                  {isGeneratingQuestions ? 'Generating Qs...' : '❓ Generate Interview Questions'}
                 </button>
               </div>
             )}
             
             {generatedCoverLetter && showCoverLetterDownloadWarning && (
-                 <div className="my-2 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-r-md">
+                 <div className="my-2 p-3 bg-yellow-900/40 border-l-4 border-yellow-500 text-yellow-200 rounded-r-md shadow">
                     <p className="text-sm font-medium">Cover Letter Ready!</p>
                     <p className="text-xs mt-1">
                         {coverLetterJobContext ? `For: ${coverLetterJobContext}. ` : ""}
                         This is saved in your browser. Copy or download it.
                     </p>
-                    <button onClick={handleClearSavedCoverLetter} className="mt-1.5 text-xs text-yellow-900 hover:underline font-semibold">Clear Saved Cover Letter</button>
+                    <button onClick={handleClearSavedCoverLetter} className="mt-1.5 text-xs text-yellow-100 hover:underline font-semibold">Clear Saved Cover Letter</button>
                  </div>
             )}
             <GeneratedContentDisplay
@@ -475,7 +476,7 @@ export default function HomePage() {
             />
 
             {generatedInterviewQuestions && showQuestionsDownloadWarning && (
-                 <div className="my-2 p-3 bg-blue-100 border-l-4 border-blue-500 text-blue-800 rounded-r-md">
+                 <div className="my-2 p-3 bg-sky-900/40 border-l-4 border-sky-500 text-sky-200 rounded-r-md shadow">
                      <p className="text-sm font-medium">Interview Questions Ready!</p>
                     <p className="text-xs mt-1">Remember to copy or note down these questions.</p>
                  </div>
@@ -489,9 +490,12 @@ export default function HomePage() {
           </section>
         </main>
 
-        <footer className="text-center mt-12 py-4 border-t border-gray-300">
-          <p className="text-sm text-gray-600">
-            Nexply - Powered by Gemini & Next.js {/* <<<< UPDATED */}
+        <footer className="text-center mt-12 py-6 border-t border-slate-700">
+          <p className="text-sm text-slate-400">
+            Nexply - Powered by Gemini & Next.js
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            UI Enhanced for a Modern Dark Theme
           </p>
         </footer>
       </div>

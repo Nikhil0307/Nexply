@@ -1,2 +1,38 @@
-@import "tailwindcss";
+@import "tailwindcss"; /* Or ensure Tailwind directives are processed if not using this line directly */
 
+@layer base {
+  html, body {
+    @apply bg-slate-900 text-slate-200;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom Scrollbar Styling (Optional - Webkit browsers) */
+  ::-webkit-scrollbar {
+    width: 10px; /* Slightly wider for easier clicking */
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-800; /* Matches surface color */
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-600 rounded-md; /* Darker thumb */
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500; /* Lighter on hover */
+  }
+
+  /* Input placeholder color for dark theme */
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-slate-500; /* Consistent placeholder color */
+  }
+}
+
+/* You can add custom utility classes here if needed */
+/* @layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+} */
